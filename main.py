@@ -6,10 +6,12 @@ Speaks agent-fun/bars-replay/v1: reads newline-delimited JSON on stdin
 line on stdout echoing the batch seq.
 
 Strategy in one paragraph: stay in cash unless the short trend is up.
-When the fast EMA sits above the slow EMA and price pulls back toward
-its rolling mean, open a long with a capped share of equity. Leave on
-a take-profit, a stop-loss, a trend flip, or a time stop. A small
-fallback entry late in the window guarantees at least one trade, and a
+When the fast EMA sits above the slow EMA, the slow EMA is rising, and
+price pulls back well below its rolling mean (or breaks out of its
+recent range), open a long with most of the equity. Leave on a
+take-profit, a stop-loss, a wide trailing stop, a trend flip, or a
+long time stop, then sit out a cooldown before re-entering. A small
+fallback entry mid-window guarantees at least one trade, and a
 drawdown guard halts new entries long before the 25% race limit.
 
 Standard library only. No network, no wall clock, no file access.
@@ -22,26 +24,26 @@ import math
 import sys
 
 # ---- tunables (fixed constants; tuned on the kit dev window) ----
-FAST = 15            # fast EMA length, bars
+FAST = 20            # fast EMA length, bars
 SLOW = 75            # slow EMA length, bars
 MEAN_WIN = 60        # rolling mean / stdev window for the z-score
-ENTRY_Z = 0.15       # buy while not extended: z-score at or below this
-BREAKOUT_WIN = 40    # breakout lookback, bars
+ENTRY_Z = -0.6       # buy on a real pullback: z-score at or below this
+BREAKOUT_WIN = 60    # breakout lookback, bars
 BREAKOUT_PAD = 0.0004  # breakout must clear the lookback high by this
 TAKE_PROFIT = 0.035  # +3.5% from entry fill estimate
 STOP_LOSS = 0.012    # -1.2% from entry fill estimate
-TRAIL = 0.016        # trailing stop: exit 1.6% below the peak close since entry
-TIME_STOP = 480      # bars before a position is closed regardless
-ALLOC = 0.6          # share of equity deployed per entry
+TRAIL = 0.03         # trailing stop: exit 3.0% below the peak close since entry
+TIME_STOP = 1400     # bars before a position is closed regardless
+ALLOC = 0.98         # share of equity deployed per entry
 MAX_WEIGHT = 0.92    # hard cap on position value / equity
 DD_HALT = 0.08       # stop opening entries past this drawdown
 DD_FLAT = 0.13       # flatten everything past this drawdown
-FALLBACK_BAR = 1050  # fallback entry no later than this bar
+FALLBACK_BAR = 700   # fallback entry no later than this bar
 FALLBACK_ALLOC = 0.22
 MAX_SLIP_BPS = 80
 MIN_BARS = 120       # bars of history required before any entry
-SLOPE_WIN = 30       # slow-EMA slope lookback, bars
-COOLDOWN = 120       # bars to sit out after any exit
+SLOPE_WIN = 60       # slow-EMA slope lookback, bars
+COOLDOWN = 240       # bars to sit out after any exit
 
 
 class Bot:
